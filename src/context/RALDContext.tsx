@@ -34,7 +34,7 @@ export interface RALDProviderProps {
  * </RALDProvider>
  */
 export function RALDProvider({ config, authApiUrl, children }: RALDProviderProps) {
-  const [user, setUser]     = useState<RALDUser | null>(null);
+  const [user, setUser]       = useState<RALDUser | null>(null);
   const [loading, setLoading] = useState(true);
   const apiBase = authApiUrl ?? config.authApiUrl ?? "https://auth.rald.cloud";
 
@@ -44,11 +44,18 @@ export function RALDProvider({ config, authApiUrl, children }: RALDProviderProps
       try {
         const r = await fetch(`${apiBase}/auth/me`, { credentials: "include" });
         if (!cancelled && r.ok) {
-          const data = (await r.json()) as { user?: RALDUser } | RALDUser;
-          setUser(("user" in data ? data.user : data) ?? null);
+          // API may return { user: RALDUser } or RALDUser directly
+          const raw = (await r.json()) as Record<string, unknown>;
+          const resolved: RALDUser | null =
+            raw.user != null
+              ? (raw.user as RALDUser)
+              : raw.id != null
+              ? (raw as unknown as RALDUser)
+              : null;
+          setUser(resolved);
         }
       } catch {
-        // network error — stay logged out, don't crash
+        // network error — stay logged out
       } finally {
         if (!cancelled) setLoading(false);
       }
